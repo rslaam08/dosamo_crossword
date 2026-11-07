@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>도사모 크로스워드</title>
+  <style>
+    :root {
+      --ink:#1c2a43; --muted:#60718c; --line:#93a4bc; --paper:#fff;
+      --canvas:#f5f7fb; --accent:#2563eb; --active:#dbeafe;
+      --current:#a5d3ff; --wall:#1d2a43;
+    }
+    * {box-sizing:border-box}
+    body {margin:0; background:var(--canvas); color:var(--ink); font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; line-height:1.55}
+    header {max-width:1060px; margin:0 auto; padding:38px 22px 20px}
+    h1 {font-size:clamp(1.7rem,4vw,2.3rem); letter-spacing:-.055em; line-height:1.3; margin:0 0 8px}
+    .subtitle {color:var(--muted); margin:0}
+    main {max-width:1060px; margin:0 auto; padding:0 22px 48px; display:grid; grid-template-columns:minmax(320px,430px) minmax(300px,1fr); gap:28px; align-items:start}
+    .panel {background:var(--paper); border:1px solid #e1e7f0; border-radius:20px; box-shadow:0 6px 24px #1d2a430a}
+    .board-panel {padding:24px; position:sticky; top:18px}
+    .topline {display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px}
+    .eyebrow {font-size:.78rem; color:var(--muted); font-weight:700; letter-spacing:.04em}
+    .counter {font-weight:700; font-size:.85rem; color:var(--accent); font-variant-numeric:tabular-nums}
+    .progress {height:6px; border-radius:99px; background:#e7edf7; margin-bottom:22px; overflow:hidden}
+    .progress > span {display:block; width:0; height:100%; background:var(--accent); transition:width .2s}
+    .grid {width:100%; max-width:380px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); border:3px solid var(--wall); margin:0 auto; aspect-ratio:1}
+    .cell {position:relative; background:#fff; border-right:1px solid var(--line); border-bottom:1px solid var(--line); min-width:0; min-height:0}
+    .cell.wall-right {border-right:4px solid var(--wall)}
+    .cell.wall-bottom {border-bottom:4px solid var(--wall)}
+    .cell.block {background:var(--wall); border-color:var(--wall)}
+    .cell.selected {background:var(--active)}
+    .cell.current {background:var(--current)}
+    .cell:focus-within {outline:2px solid var(--accent); outline-offset:-3px; z-index:1}
+    .cell input {border:0; outline:0; width:100%; height:100%; background:transparent; color:var(--ink); font-family:inherit; font-weight:750; font-size:clamp(20px,5vw,30px); text-align:center; padding:15px 0 2px; caret-color:var(--accent); border-radius:0}
+    .cell input:focus {outline:0}
+    .numbers {position:absolute; top:2px; left:4px; display:flex; gap:3px; pointer-events:none; line-height:1.15; font-size:clamp(8px,1.35vw,10px); font-weight:700; color:#4c6486; white-space:nowrap}
+    .selected .numbers,.current .numbers {color:#315c9b}
+    .active-clue {min-height:64px; margin-top:17px; padding:11px 13px; border-radius:12px; background:#eff5ff; font-size:.91rem}
+    .active-clue .eyebrow {display:block; margin-bottom:3px; color:#3764a5}
+    .actions {display:flex; gap:8px; margin-top:13px; justify-content:space-between; align-items:center; flex-wrap:wrap}
+    .tip {color:var(--muted); font-size:.79rem; margin:13px 0 0}
+    .clear {cursor:pointer; background:#fff; color:var(--muted); border:1px solid #cbd5e1; border-radius:9px; padding:7px 12px; font:inherit; font-size:.84rem}
+    .clear:hover {background:#f1f5f9; color:var(--ink)}
+    .clue-panel {padding:23px}
+    .clue-group + .clue-group {margin-top:25px}
+    h2 {font-size:1.04rem; margin:0 0 12px; letter-spacing:-.025em}
+    .clues {list-style:none; margin:0; padding:0; display:grid; gap:7px}
+    .clue {width:100%; display:flex; gap:11px; text-align:left; border:1px solid transparent; padding:10px 11px; border-radius:11px; background:#fff; cursor:pointer; color:inherit; font:inherit; font-size:.9rem; line-height:1.52}
+    .clue:hover {background:#f1f6ff}
+    .clue[aria-pressed="true"] {background:#eaf2ff; border-color:#bdd5ff}
+    .clue-num {min-width:31px; height:28px; padding:3px 5px; text-align:center; border-radius:7px; background:#edf2f9; font-weight:800; color:#35577e; font-size:.82rem; flex-shrink:0}
+    .clue[aria-pressed="true"] .clue-num {background:var(--accent); color:white}
+    .clue-text {flex:1; min-width:0; overflow-wrap:anywhere}
+    .clue-length {font-size:.75rem; color:#718198; white-space:nowrap; flex-shrink:0; padding-top:3px}
+    footer {max-width:1060px; margin:0 auto; padding:0 22px 34px; text-align:center; font-size:.8rem; color:var(--muted)}
+    @media(max-width:780px) {
+      header {padding:24px 16px 18px}
+      main {grid-template-columns:1fr; padding:0 16px 35px; gap:16px}
+      .board-panel {position:static; padding:18px}
+      .clue-panel {padding:18px}
+      .grid {max-width:360px}
+    }
+    @media(max-width:360px) {.cell input {padding-top:10px}.numbers {font-size:7.5px;left:2px}}
+    @media(prefers-reduced-motion:reduce) {.progress > span {transition:none}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>도사모 크로스워드</h1>
+  <p class="subtitle">힌트를 눌러 단어를 선택하고, 칸에 한 글자씩 입력하세요.</p>
+</header>
+<main>
+  <section class="panel board-panel" aria-label="크로스워드 퍼즐판">
+    <div class="topline"><span class="eyebrow">퍼즐 · 5 × 5</span><span class="counter" id="counter">0 / 23칸</span></div>
+    <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+    <div class="grid" id="grid" role="group" aria-label="5행 5열 크로스워드"></div>
+    <div class="active-clue" id="activeClue" aria-live="polite"></div>
+    <div class="actions"><span class="eyebrow" id="directionHint">가로 힌트</span><button type="button" class="clear" id="clear">전체 지우기</button></div>
+    <p class="tip">교차하는 칸을 다시 누르거나 Enter를 누르면 방향이 바뀝니다. 화살표, Backspace, 붙여넣기도 사용할 수 있습니다. 입력 내용은 이 브라우저에 저장됩니다.</p>
+  </section>
+  <section class="panel clue-panel" aria-label="힌트 목록">
+    <div class="clue-group"><h2>가로 힌트</h2><ol class="clues" id="across"></ol></div>
+    <div class="clue-group"><h2>세로 힌트</h2><ol class="clues" id="down"></ol></div>
+  </section>
+</main>
+<footer>정답 확인 기능은 없습니다. 이 페이지에는 정답 데이터가 들어 있지 않습니다.</footer>
+<script>
+(() => {
+  'use strict';
+
+  // 퍼즐에 포함된 정보는 칸 위치와 힌트뿐입니다. 정답 데이터는 없습니다.
+  const words = [
+    {id:'a1', dir:'across', num:1, r:0, c:1, len:2, clue:'AI가 슬슬 풀기 시작한 것, 예를 들면 지수 시간 법칙'},
+    {id:'a2', dir:'across', num:2, r:0, c:3, len:2, clue:'11101100 10011101 10110100 11101100 10100111 1000010'},
+    {id:'a3', dir:'across', num:3, r:1, c:0, len:4, clue:'OOOO태만: 운전할 때 이러면 안 돼요'},
+    {id:'a4', dir:'across', num:4, r:2, c:1, len:3, clue:'<strong><em>우리가 사랑하는 것</em></strong>'},
+    {id:'a5', dir:'across', num:5, r:3, c:1, len:4, clue:'회사에서 월급과 별개로 공헌도에 따라 돈을 주는 제도'},
+    {id:'a6', dir:'across', num:6, r:4, c:0, len:2, clue:'발라드그룹 순순희의 멤버 중 하나'},
+    {id:'a7', dir:'across', num:7, r:4, c:2, len:2, clue:'실제로 드러나는 행동, 도사모에서는 좋지 못하면 내란 태그가 붙음'},
+
+    {id:'d1', dir:'down', num:1, r:1, c:0, len:4, clue:'1980년부터 22년간 방영된 드라마… 혹은 <strong><em>가로 4번</em></strong>이 시골에 가서 써 내려갈 수도 있는 것'},
+    {id:'d2', dir:'down', num:2, r:0, c:1, len:2, clue:'사감선생님 추워요 OO 전환해주세요ㅠㅠ'},
+    {id:'d3', dir:'down', num:3, r:2, c:1, len:3, clue:'계단이 일을 한다고 주장한 사상가'},
+    {id:'d4', dir:'down', num:4, r:0, c:2, len:5, clue:'1월 11일 일본 여행 대신 할 수도 있었던 거'},
+    {id:'d5', dir:'down', num:5, r:0, c:3, len:3, clue:'도사모의 인원이자 언올 국대'},
+    {id:'d6', dir:'down', num:6, r:3, c:3, len:2, clue:'<strong><em>가로 4번</em></strong>과 도순이 사이에는 OO이 좋다'},
+    {id:'d7', dir:'down', num:7, r:0, c:4, len:4, clue:'중국을 최초로 통일시켰지만 <strong><em>가로 4번</em></strong>보다는 권력이 약한 황제'}
+  ];
+  const byId = Object.fromEntries(words.map(w => [w.id,w]));
+  const board = document.getElementById('grid');
+  const inputs = new Map();
+  const membership = new Map();
+  const storageKey = 'dosamo-crossword-entries-v1';
+  const key = (r,c) => `${r},${c}`;
+  const positions = w => Array.from({length:w.len},(_,i) => ({r:w.r+(w.dir==='down'?i:0), c:w.c+(w.dir==='across'?i:0)}));
+  for (const w of words) for(const p of positions(w)) {
+    const k=key(p.r,p.c);
+    if(!membership.has(k)) membership.set(k,[]);
+    membership.get(k).push(w.id);
+  }
+  const sameWord = (r1,c1,r2,c2,dir) => {
+    const first=membership.get(key(r1,c1))||[];
+    const second=membership.get(key(r2,c2))||[];
+    return first.some(id => second.includes(id) && byId[id].dir===dir);
+  };
+  let saved = {};
+  try { const parsed = JSON.parse(localStorage.getItem(storageKey)||'{}'); if(parsed && typeof parsed==='object') saved=parsed; } catch {}
+
+  for(let r=0;r<5;r++) for(let c=0;c<5;c++) {
+    const k=key(r,c), ids=membership.get(k)||[];
+    const cell=document.createElement('div');
+    cell.className='cell'+(ids.length?'':' block');
+    cell.dataset.key=k;
+    if(ids.length) {
+      if(c<4 && membership.has(key(r,c+1)) && !sameWord(r,c,r,c+1,'across')) cell.classList.add('wall-right');
+      if(r<4 && membership.has(key(r+1,c)) && !sameWord(r,c,r+1,c,'down')) cell.classList.add('wall-bottom');
+      const starts=words.filter(w=>w.r===r&&w.c===c);
+      if(starts.length) {
+        const nums=document.createElement('span'); nums.className='numbers';
+        for(const w of starts) {
+          const tag=document.createElement('span');
+          tag.textContent=(w.dir==='across'?'가':'세')+w.num;
+          nums.appendChild(tag);
+        }
+        cell.appendChild(nums);
+      }
+      const input=document.createElement('input');
+      input.type='text'; input.autocomplete='off'; input.autocapitalize='off'; input.spellcheck=false;
+      input.inputMode='text'; input.maxLength=3;
+      input.setAttribute('aria-label',`${r+1}행 ${c+1}열`);
+      input.value=(typeof saved[k]==='string'?Array.from(saved[k])[0]||'':'');
+      input.dataset.key=k;
+      cell.appendChild(input); inputs.set(k,input);
+    }
+    board.appendChild(cell);
+  }
+  let selected='a1';
+  let focusedKey=key(0,1);
+  const label = w => (w.dir==='across'?'가로 ':'세로 ')+w.num+'번';
+  function refresh() {
+    const w=byId[selected];
+    const inWord = new Set(positions(w).map(p=>key(p.r,p.c)));
+    for(const [k,input] of inputs) {
+      input.parentElement.classList.toggle('selected',inWord.has(k));
+      input.parentElement.classList.toggle('current',inWord.has(k)&&k===focusedKey);
+    }
+    document.querySelectorAll('.clue').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.id===selected)));
+    document.getElementById('activeClue').innerHTML=`<span class="eyebrow">${label(w)} · ${w.len}칸</span>${w.clue}`;
+    document.getElementById('directionHint').textContent=w.dir==='across'?'현재 방향: 가로':'현재 방향: 세로';
+  }
+  function progress() {
+    let filled=0; const value={};
+    for(const [k,input] of inputs) {
+      if(input.value) {filled++; value[k]=input.value;}
+    }
+    document.getElementById('counter').textContent=`${filled} / ${inputs.size}칸`;
+    document.getElementById('progressBar').style.width=`${100*filled/inputs.size}%`;
+    try {localStorage.setItem(storageKey,JSON.stringify(value));} catch {}
+  }
+  function setSelected(id,preferEmpty=false) {
+    selected=id;
+    const ps=positions(byId[selected]);
+    const target=(preferEmpty?ps.find(p=>!inputs.get(key(p.r,p.c)).value):null)||ps[0];
+    focusAt(key(target.r,target.c));
+  }
+  function focusAt(k) {
+    if(!inputs.has(k)) return;
+    focusedKey=k;
+    inputs.get(k).focus();
+    refresh();
+  }
+  function move(delta) {
+    const ps=positions(byId[selected]);
+    const i=ps.findIndex(p=>key(p.r,p.c)===focusedKey);
+    if(i===-1) return;
+    const j=i+delta;
+    if(j>=0&&j<ps.length) focusAt(key(ps[j].r,ps[j].c));
+  }
+  function inputFinalized(input) {
+    const chars=Array.from(input.value.trim());
+    input.value=chars.length?chars[chars.length-1]:'';
+    focusedKey=input.dataset.key;
+    progress();
+    if(input.value) move(1);
+    else refresh();
+  }
+  for(const [k,input] of inputs) {
+    input.addEventListener('focus',()=>{
+      focusedKey=k;
+      if(!(membership.get(k)||[]).includes(selected)) {
+        const wordIds=membership.get(k)||[];
+        selected=wordIds.find(id=>byId[id].dir===byId[selected].dir)||wordIds[0]||selected;
+      }
+      refresh();
+    });
+    input.addEventListener('click',()=>{
+      if(focusedKey===k && (membership.get(k)||[]).length===2) {
+        const now=membership.get(k);
+        // 첫 클릭은 현재 선택을 유지하고, 재클릭 시 방향을 전환합니다.
+        if(input.dataset.wasClicked==='yes') selected=now.find(id=>id!==selected)||selected;
+        input.dataset.wasClicked='yes';
+        refresh();
+      }
+    });
+    input.addEventListener('blur',()=>{input.dataset.wasClicked='no';});
+    input.addEventListener('compositionend',()=>inputFinalized(input));
+    input.addEventListener('input',e=>{if(!e.isComposing) inputFinalized(input);});
+    input.addEventListener('keydown',e=>{
+      if(e.isComposing) return;
+      if(e.key==='Backspace') {
+        if(!input.value) {e.preventDefault(); move(-1); const previous=inputs.get(focusedKey); if(previous) {previous.value='';progress();}}
+        return;
+      }
+      if(e.key==='Enter' || e.key===' ') {
+        const choices=membership.get(k)||[];
+        if(choices.length>1) {e.preventDefault(); selected=choices.find(id=>id!==selected)||selected; refresh();}
+      }
+      if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        const [rs,cs]=k.split(',').map(Number);
+        const dr=e.key==='ArrowUp'?-1:e.key==='ArrowDown'?1:0;
+        const dc=e.key==='ArrowLeft'?-1:e.key==='ArrowRight'?1:0;
+        const next=key(rs+dr,cs+dc);
+        if(inputs.has(next)) {
+          const dir=dr?'down':'across';
+          const options=membership.get(next)||[];
+          const common=(membership.get(k)||[]).find(id=>options.includes(id)&&byId[id].dir===dir);
+          const candidate=common||options.find(id=>byId[id].dir===dir);
+          if(candidate) selected=candidate;
+          focusAt(next);
+        }
+      }
+    });
+    input.addEventListener('paste',e=>{
+      const raw=e.clipboardData && e.clipboardData.getData('text');
+      if(!raw) return;
+      e.preventDefault();
+      const chars=Array.from(raw.replace(/\s/g,''));
+      const ps=positions(byId[selected]);
+      const start=ps.findIndex(p=>key(p.r,p.c)===k);
+      if(start<0) return;
+      let last=k;
+      chars.slice(0,ps.length-start).forEach((ch,i)=>{
+        const target=key(ps[start+i].r,ps[start+i].c);
+        inputs.get(target).value=ch;
+        last=target;
+      });
+      progress();focusAt(last);
+    });
+  }
+  for(const w of words) {
+    const li=document.createElement('li');
+    const button=document.createElement('button');
+    button.type='button';button.className='clue';button.dataset.id=w.id;
+    button.innerHTML=`<span class="clue-num">${w.num}</span><span class="clue-text">${w.clue}</span><span class="clue-length">${w.len}칸</span>`;
+    button.addEventListener('click',()=>setSelected(w.id,true));
+    li.appendChild(button);
+    document.getElementById(w.dir).appendChild(li);
+  }
+  document.getElementById('clear').addEventListener('click',()=>{
+    if(!confirm('모든 입력을 지울까요?')) return;
+    inputs.forEach(input=>input.value='');
+    progress();setSelected('a1');
+  });
+  refresh();progress();
+})();
+</script>
+</body>
+</html>
